@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Ahola Tetris — Way Ahead</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;900&display=swap');
+  :root{--red:#CB043E;--dark:#3C3C3B;--white:#FFFFFF;}
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;}
+  body{background:var(--dark);color:var(--white);font-family:'Barlow Condensed',sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;touch-action:none;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(203,4,62,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(203,4,62,0.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;}
+
+  /* HEADER */
+  header{position:fixed;top:0;left:0;right:0;display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:rgba(40,40,39,0.97);border-bottom:2px solid var(--red);z-index:100;}
+  .logo-wrap svg{height:24px;width:auto;display:block;}
+  .header-right{text-align:right;}
+  .game-badge{font-weight:900;font-size:15px;letter-spacing:2px;text-transform:uppercase;display:flex;align-items:center;gap:0;}
+  .game-badge span{color:var(--red);}
+  .game-sub{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.35);}
+
+  /* MAIN LAYOUT */
+  .game-wrapper{display:flex;align-items:flex-start;gap:16px;margin-top:56px;margin-bottom:32px;padding:8px;}
+
+  /* SIDE PANELS */
+  .side-panel,.right-panel{display:flex;flex-direction:column;gap:10px;width:108px;}
+  .panel-card{background:rgba(0,0,0,0.45);border:1px solid rgba(203,4,62,0.2);border-top:2px solid var(--red);padding:8px 10px;}
+  .panel-label{font-weight:700;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--red);margin-bottom:2px;}
+  .panel-value{font-weight:900;font-size:26px;color:var(--white);line-height:1;}
+  .panel-sub{font-size:8px;color:rgba(255,255,255,0.35);margin-top:1px;letter-spacing:1px;text-transform:uppercase;}
+  #next-canvas{display:block;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.07);}
+
+  /* GAME CANVAS */
+  #game-canvas{display:block;border:2px solid rgba(203,4,62,0.3);background:rgba(0,0,0,0.65);box-shadow:0 0 30px rgba(203,4,62,0.1);}
+  .canvas-wrapper{position:relative;}
+
+  /* BUTTONS */
+  .btn{font-weight:700;font-size:12px;letter-spacing:2px;text-transform:uppercase;padding:9px 12px;border:none;cursor:pointer;width:100%;transition:all .15s;}
+  .btn-primary{background:var(--red);color:var(--white);}
+  .btn-secondary{background:transparent;color:var(--white);border:1px solid rgba(255,255,255,0.22);}
+  .controls-info{background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.07);padding:9px 10px;}
+  .key-row{display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.05);font-size:10px;color:rgba(255,255,255,0.5);}
+  .key-row:last-child{border-bottom:none;}
+  kbd{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);padding:1px 4px;font-size:9px;border-radius:2px;color:var(--white);}
+
+  /* OVERLAY */
+  #overlay{position:absolute;inset:0;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10;}
+  .overlay-eyebrow{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:rgba(255,255,255,0.35);}
+  .overlay-title{font-weight:900;font-size:40px;letter-spacing:5px;text-transform:uppercase;color:var(--red);line-height:1;}
+  .overlay-divider{width:48px;height:2px;background:var(--red);}
+  .overlay-sub{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.4);text-align:center;}
+  .overlay-score{font-weight:900;font-size:48px;color:var(--white);line-height:1;}
+  .overlay-btn{font-weight:700;font-size:13px;letter-spacing:3px;text-transform:uppercase;padding:11px 32px;background:var(--red);color:var(--white);border:none;cursor:pointer;margin-top:4px;}
+
+  /* FOOTER */
+  footer{position:fixed;bottom:0;left:0;right:0;padding:6px 16px;background:rgba(0,0,0,0.65);display:flex;justify-content:center;align-items:center;gap:4px;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.22);}
+  footer span{color:var(--red);opacity:.6;}
+
+  /* ── MOBILE LAYOUT ── */
+  /* Touch controls — hidden on desktop */
+  .touch-controls{display:none;position:fixed;bottom:32px;left:0;right:0;z-index:50;padding:0 12px;}
+  .touch-row{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .touch-row+.touch-row{margin-top:8px;}
+  .t-btn{flex:1;background:rgba(0,0,0,0.6);border:1px solid rgba(203,4,62,0.4);color:var(--white);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:20px;padding:14px 0;cursor:pointer;border-radius:4px;user-select:none;-webkit-user-select:none;text-align:center;transition:background .1s;}
+  .t-btn:active{background:rgba(203,4,62,0.35);}
+  .t-btn-drop{background:rgba(203,4,62,0.2);border-color:var(--red);font-size:13px;letter-spacing:2px;}
+  .t-btn-drop:active{background:rgba(203,4,62,0.5);}
+
+  @media (max-width: 600px) {
+    /* Show touch controls, hide keyboard controls */
+    .touch-controls{display:block;}
+    .controls-info{display:none;}
+
+    /* Collapse side panels into a compact top bar */
+    .game-wrapper{
+      flex-direction:column;
+      align-items:center;
+      gap:8px;
+      margin-top:52px;
+      margin-bottom:0;
+      padding:6px 8px;
+    }
+    .side-panel{
+      flex-direction:row;
+      width:100%;
+      gap:6px;
+    }
+    .right-panel{
+      flex-direction:row;
+      width:100%;
+      gap:6px;
+      flex-wrap:wrap;
+    }
+    .panel-card{
+      flex:1;
+      padding:5px 8px;
+    }
+    .panel-value{font-size:20px;}
+    .panel-label{font-size:8px;}
+    .panel-sub{display:none;}
+
+    /* Next piece card takes fixed width */
+    .next-card{flex:0 0 auto !important;}
+
+    /* Buttons row */
+    .btn{padding:8px 10px;font-size:11px;}
+
+    /* Branding strip hidden on mobile */
+    .way-ahead-strip{display:none;}
+
+    /* Footer minimal */
+    footer{font-size:8px;letter-spacing:1px;padding:5px 8px;}
+    footer .hide-mobile{display:none;}
+
+    /* Header compact */
+    .logo-wrap svg{height:20px;}
+    .game-badge{font-size:13px;}
+    .game-sub{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-wrap">
+    <svg viewBox="0 0 1517.52 366.89" xmlns="http://www.w3.org/2000/svg"><g id="Group_3" data-name="Group 3">
+    <path id="Path_1" data-name="Path 1" fill="#ffffff" d="M1198.48,109.11h-49.09v109.17c-.06,4.52,1.24,8.96,3.74,12.73,2.45,3.74,5.57,7,9.2,9.61,3.53,2.57,7.45,4.56,11.61,5.9,3.53,1.2,7.21,1.84,10.94,1.92h116.85v-31.25h-90.7c-2.81.22-5.62-.33-8.13-1.6-2.49-1.28-4.15-3.75-4.4-6.55v-99.95Z"/>
+    <path id="Path_2" data-name="Path 2" fill="#ffffff" d="M1363.14,184.49h106.04v-33.96c.4-2.46-.2-4.98-1.67-6.99-1.74-1.96-4.25-3.06-6.87-2.99l-83,.06c-2.65-.25-5.3.54-7.38,2.2-1.66,2.2-2.46,4.94-2.24,7.69v97.93h-48.82v-105.26c.25-10.72,5.54-20.69,14.27-26.91,7.27-4.75,15.78-7.26,24.46-7.23h120.62c8.64-.09,17.13,2.24,24.51,6.73,8.61,6.13,13.93,15.87,14.42,26.43l.06,106.23h-48.3v-33.14h-106.21l.13-30.79Z"/>
+    <path id="Path_3" data-name="Path 3" fill="#ffffff" d="M508.68,184.49h103.54v-33.96c.4-2.46-.2-4.98-1.67-6.99-1.74-1.96-4.25-3.06-6.87-2.99l-83.01.06c-2.65-.25-5.3.54-7.38,2.2-1.66,2.2-2.46,4.94-2.24,7.69v97.93h-48.82v-105.26c.25-10.72,5.54-20.69,14.27-26.91,7.27-4.75,15.78-7.26,24.46-7.23h120.62c8.64-.09,17.13,2.24,24.51,6.73,8.61,6.13,13.93,15.87,14.42,26.43l.06,106.23h-48.33v-33.14h-103.51l-.03-30.79Z"/>
+    <path id="Path_4" data-name="Path 4" fill="#ffffff" d="M844.5,248.42v-53.57h-101.4v53.57h-48.83V109.06h48.83v55h101.4v-55h48.57v139.36h-48.57Z"/>
+    <path id="Path_5" data-name="Path 5" fill="#ffffff" d="M1120.7,215.67c-.57,8.38-4.14,16.27-10.04,22.24-7.74,7.04-17.91,10.8-28.37,10.5h-120.27c-9.71.4-19.27-2.49-27.12-8.21-7.34-6.07-11.88-14.88-12.55-24.38l.11-71.84c-.07-10.61,4.86-20.64,13.3-27.07,7.58-5.35,16.68-8.1,25.95-7.86h120.88c9.72.05,19.16,3.24,26.91,9.09,7,6.44,11.05,15.48,11.21,24.99v72.54ZM971.28,207.98c.05,2.57,1.08,5.03,2.88,6.86,1.93,1.37,4.26,2.04,6.62,1.92l82.54.12c2.78.2,5.53-.77,7.55-2.69,1.52-2.06,2.17-4.63,1.8-7.16v-57.3c.25-2.25-.39-4.5-1.77-6.29-1.64-1.86-4.01-2.91-6.49-2.88h-83.08c-2.81-.24-5.61.57-7.86,2.28-1.69,1.93-2.48,4.47-2.19,7.02v58.13Z"/>
+    <g id="Group_2" data-name="Group 2">
+      <g id="Group_1" data-name="Group 1">
+        <path id="Path_6" data-name="Path 6" fill="#ffffff" d="M219.52,366.94c-8.49-.22-15.19-7.28-14.97-15.78.18-7,5.07-12.99,11.89-14.58,2.88-.59,5.77-1.27,8.65-2.03,52.9-14.22,94.36-55.32,109.05-108.09,2.87-7.99,11.67-12.15,19.67-9.28,7.16,2.57,11.37,9.98,9.9,17.44-17.62,63.24-67.31,112.49-130.71,129.53-3.41.91-6.88,1.73-10.33,2.43-1.03.22-2.09.34-3.14.35Z"/>
+      </g>
+      <path id="Path_7" data-name="Path 7" fill="#ffffff" d="M396.38,170.36l-146.2-.2c10.88-35.67,20.33-63.55,22.57-71.12,1.24-4.16,4.81-20.13-12.29-21.93-13.11-1.3-26.29-1.65-39.45-1.07-13.43.48-26.29,5.57-36.42,14.42-10.84,8.12-19.75,23.38-28.55,47.31-4.09,11.24-7.88,22.11-11.26,32.27h-32.8c-33.26,0-48.06,21.57-50.65,40.04-2.2,13.02,1.26,26.35,9.51,36.66,9.58,11.12,23.39,17.7,38.06,18.14,23.61.53,44.49-15.24,50.44-38.1,1.77-6.46,4.38-15.38,7.69-26l41.62.06c-14.56,46.82-27.66,87.23-31.77,95.3-6.72,17.22-24.05,27.88-42.44,26.12h-1.17c-20.9-.28-42.01-14.72-51.9-22.47-63.15-57.41-67.8-155.14-10.39-218.29,57.41-63.15,155.14-67.8,218.29-10.4,21.45,19.5,36.98,44.64,44.82,72.55,2.91,7.98,11.74,12.08,19.72,9.17,7.11-2.6,11.28-9.98,9.82-17.41-10.85-38.51-33.81-72.51-65.47-96.97C265.81,13.41,226.06-.12,185.19,0,82.92,0,0,82.89,0,185.15c0,48,18.63,94.13,51.98,128.65,20.74,23.19,49.83,37.21,80.89,39h1.58c29.95,1.71,57.79-15.41,69.8-42.89,5.64-11.1,21.5-60.48,36.52-109.15l155.58.22h0c8.47-.64,14.82-8.02,14.18-16.49-.57-7.58-6.6-13.61-14.18-14.18l.05.05ZM129.75,218.63c-2.34,10.38-11.67,17.67-22.31,17.45-9.79-.23-17.54-8.35-17.31-18.14.22-9.47,7.84-17.09,17.31-17.31h27.53c-2.15,7.09-3.92,13.22-5.22,18ZM237.29,109.59c-5.92,19.81-12.49,38.67-19.16,60.55l-40.99-.07c2.4-7.01,4.98-14.3,7.69-21.77,3.53-11.6,8.61-22.68,15.1-32.93,8.62-11.53,40.24-14.41,37.36-5.78h0Z"/>
+    </g>
+  </g></svg>
+  </div>
+  <div class="header-right">
+    <div class="game-badge">TETRIS <span style="color:#CB043E;margin:0 6px">—</span> <svg viewBox="0 0 743.04 54.1" width="80" height="7" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;opacity:0.8"><polygon fill="#ffffff" points="76.2 30.14 61.57 0 46.79 0 32.24 30.13 17.7 0 0 0 25.73 53.62 25.96 54.1 38.44 54.1 54.13 21.49 69.92 54.1 82.4 54.1 108.35 0 90.75 0 76.2 30.14"/>
+  <path fill="#ffffff" d="M184.36,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM172.17,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="238.58 20.35 217.22 0 197.14 0 230.25 34.02 230.25 54.1 246.91 54.1 246.91 34.09 280.12 0 259.84 0 238.58 20.35"/>
+  <path fill="#ffffff" d="M392.08,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM379.89,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="469.34 20.53 430.23 20.53 430.23 0 413.67 0 413.67 54.1 430.23 54.1 430.23 33.57 469.34 33.57 469.34 54.1 485.91 54.1 485.91 0 469.34 0 469.34 20.53"/>
+  <polygon fill="#ffffff" points="503.13 54.1 568.64 54.1 568.64 41.06 519.88 41.06 519.88 33.57 559.14 33.57 559.14 20.53 519.88 20.53 519.88 13.04 568.64 13.04 568.64 0 503.13 0 503.13 54.1"/>
+  <path fill="#ffffff" d="M650.56,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.47v16.89h16.76V11.62c0-3.22-1.54-6.01-4.56-8.28ZM638.37,13.04v11.13h-37.47v-11.13h37.47Z"/>
+  <path fill="#ffffff" d="M738.48,3.33c-2.95-2.21-6.51-3.33-10.59-3.33h-55.65v54.1h55.65c4.07,0,7.63-1.12,10.59-3.33,3.03-2.27,4.56-5.05,4.56-8.28V11.62c0-3.23-1.53-6.01-4.56-8.28ZM726.29,13.04v28.02h-37.48V13.04h37.48Z"/></svg></div>
+    <div class="game-sub">Internal Game · Ahola Group</div>
+  </div>
+</header>
+
+<div class="game-wrapper">
+
+  <!-- LEFT PANEL -->
+  <div class="side-panel">
+    <div class="panel-card"><div class="panel-label">Score</div><div class="panel-value" id="score-display">0</div><div class="panel-sub">Points</div></div>
+    <div class="panel-card"><div class="panel-label">Level</div><div class="panel-value" id="level-display">1</div><div class="panel-sub">Speed</div></div>
+    <div class="panel-card"><div class="panel-label">Lines</div><div class="panel-value" id="lines-display">0</div><div class="panel-sub">Cleared</div></div>
+    <div class="panel-card"><div class="panel-label">Best</div><div class="panel-value" id="best-display">0</div><div class="panel-sub">High score</div></div>
+  </div>
+
+  <!-- GAME CANVAS -->
+  <div class="canvas-wrapper">
+    <canvas id="game-canvas"></canvas>
+    <div id="overlay">
+      <svg viewBox="0 0 1110.27 989.45" width="48" height="43" xmlns="http://www.w3.org/2000/svg"><path fill="#CB043E" d="M592.01,989.45c-19.22,0-36.44-13.47-40.46-33.04-4.6-22.37,9.81-44.23,32.18-48.82,7.74-1.59,15.55-3.43,23.21-5.47,142.23-37.87,254.94-149.54,294.16-291.42,6.08-22.01,28.85-34.93,50.87-28.84,22.01,6.08,34.92,28.86,28.84,50.87-47,170.06-182.1,303.91-352.58,349.3-9.19,2.45-18.56,4.66-27.85,6.56-2.8.58-5.61.85-8.36.85Z"/>
+  <path fill="#CB043E" d="M1068.98,459.33c-3.81,0-200.8-.29-394.28-.57,29.34-96.19,54.8-171.36,60.85-191.74,3.33-11.23,12.92-54.27-33.15-59.14-3.05-.32-49.55-5.46-106.4-2.88-31.06,1.41-56.85,7.75-98.2,38.76-29.22,21.92-53.27,63.07-77.01,127.57-11.04,30.31-21.24,59.7-30.38,87.03-49.45-.07-82.56-.11-88.47-.11-89.68,0-129.62,58.18-136.57,107.99-5.26,37.69,3.61,71.87,25.64,98.86,23.59,28.88,60.04,46.25,102.63,48.91,60.51,3.82,119.04-40.38,136.05-102.75,4.75-17.41,11.82-41.51,20.8-70.13,34.09.05,72.15.1,112.23.16-39.24,126.26-74.6,235.23-85.67,257.02-18.15,35.68-41.96,70.45-114.46,70.45-1.04,0-2.11,0-3.17-.02-56.38-.77-113.3-39.7-139.87-60.6-87.09-79-136.86-190.95-136.86-308.73,0-229.77,186.94-416.71,416.71-416.71,92.87,0,180.73,29.88,254.08,86.4,71.09,54.78,123.43,132.26,147.38,218.18,6.13,22,28.93,34.87,50.93,28.73,22-6.13,34.86-28.93,28.73-50.93-28.71-103.02-91.41-195.88-176.56-261.49C716.01,35.82,610.7,0,499.41,0,224.03,0,0,224.03,0,499.41c0,130.02,50.62,254.1,140.16,346.85,1.95,3.32,88.88,103,218.13,105.17,1.43.02,2.84.03,4.25.03,115.88,0,162.9-65.85,188.23-115.67,15.22-29.93,57.97-163.12,98.56-294.38,201.19.29,415.56.6,419.53.61h.06c22.81,0,41.31-18.47,41.35-41.29.03-22.84-18.45-41.38-41.29-41.41ZM349.92,589.5c-4.65,17.05-22.68,49.64-60.15,47.06-26.4,0-47.81-21.4-47.81-47.81s21.4-47.81,47.81-47.81c1.66,0,39.56.03,74.23.07-5.81,19.13-10.56,35.57-14.08,48.49ZM639.94,295.44c-15.99,53.44-33.65,104.28-51.71,163.19-38.85-.06-76.27-.11-110.55-.16,6.49-18.9,13.43-38.59,20.76-58.71,24.08-65.4,36.84-83.66,40.71-88.82,23.26-31.01,108.54-38.76,100.79-15.51Z"/></svg>
+      <div class="overlay-eyebrow">Ahola Group Presents</div>
+      <div class="overlay-title">TETRIS</div>
+      <div class="overlay-divider"></div>
+      <svg viewBox="0 0 743.04 54.1" width="150" height="11" xmlns="http://www.w3.org/2000/svg" style="display:block"><polygon fill="#ffffff" points="76.2 30.14 61.57 0 46.79 0 32.24 30.13 17.7 0 0 0 25.73 53.62 25.96 54.1 38.44 54.1 54.13 21.49 69.92 54.1 82.4 54.1 108.35 0 90.75 0 76.2 30.14"/>
+  <path fill="#ffffff" d="M184.36,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM172.17,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="238.58 20.35 217.22 0 197.14 0 230.25 34.02 230.25 54.1 246.91 54.1 246.91 34.09 280.12 0 259.84 0 238.58 20.35"/>
+  <path fill="#ffffff" d="M392.08,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM379.89,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="469.34 20.53 430.23 20.53 430.23 0 413.67 0 413.67 54.1 430.23 54.1 430.23 33.57 469.34 33.57 469.34 54.1 485.91 54.1 485.91 0 469.34 0 469.34 20.53"/>
+  <polygon fill="#ffffff" points="503.13 54.1 568.64 54.1 568.64 41.06 519.88 41.06 519.88 33.57 559.14 33.57 559.14 20.53 519.88 20.53 519.88 13.04 568.64 13.04 568.64 0 503.13 0 503.13 54.1"/>
+  <path fill="#ffffff" d="M650.56,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.47v16.89h16.76V11.62c0-3.22-1.54-6.01-4.56-8.28ZM638.37,13.04v11.13h-37.47v-11.13h37.47Z"/>
+  <path fill="#ffffff" d="M738.48,3.33c-2.95-2.21-6.51-3.33-10.59-3.33h-55.65v54.1h55.65c4.07,0,7.63-1.12,10.59-3.33,3.03-2.27,4.56-5.05,4.56-8.28V11.62c0-3.23-1.53-6.01-4.56-8.28ZM726.29,13.04v28.02h-37.48V13.04h37.48Z"/></svg>
+      <div class="overlay-sub" id="overlay-sub">Stack the blocks · Clear the lines</div>
+      <div class="overlay-score" id="overlay-score" style="display:none"></div>
+      <button class="overlay-btn" id="overlay-btn" onclick="startGame()">START GAME</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-card next-card"><div class="panel-label">Next</div><canvas id="next-canvas" width="96" height="72"></canvas></div>
+    <button class="btn btn-primary" id="pause-btn" onclick="togglePause()" style="display:none">PAUSE</button>
+    <button class="btn btn-secondary" onclick="showMenu()">MENU</button>
+    <div class="controls-info">
+      <div class="panel-label" style="margin-bottom:6px">Controls</div>
+      <div class="key-row"><span>Move</span><span><kbd>← →</kbd></span></div>
+      <div class="key-row"><span>Rotate</span><span><kbd>↑</kbd></span></div>
+      <div class="key-row"><span>Soft drop</span><span><kbd>↓</kbd></span></div>
+      <div class="key-row"><span>Hard drop</span><span><kbd>Space</kbd></span></div>
+      <div class="key-row"><span>Pause</span><span><kbd>P</kbd></span></div>
+    </div>
+    <div class="way-ahead-strip" style="text-align:center;padding:4px 0 2px">
+      <svg viewBox="0 0 743.04 54.1" width="100" height="7" xmlns="http://www.w3.org/2000/svg" style="display:block;opacity:0.45;margin:0 auto"><polygon fill="#ffffff" points="76.2 30.14 61.57 0 46.79 0 32.24 30.13 17.7 0 0 0 25.73 53.62 25.96 54.1 38.44 54.1 54.13 21.49 69.92 54.1 82.4 54.1 108.35 0 90.75 0 76.2 30.14"/>
+  <path fill="#ffffff" d="M184.36,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM172.17,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="238.58 20.35 217.22 0 197.14 0 230.25 34.02 230.25 54.1 246.91 54.1 246.91 34.09 280.12 0 259.84 0 238.58 20.35"/>
+  <path fill="#ffffff" d="M392.08,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.48v16.89h16.75V11.62c0-3.22-1.53-6.01-4.56-8.28ZM379.89,13.04v11.13h-37.48v-11.13h37.48Z"/>
+  <polygon fill="#ffffff" points="469.34 20.53 430.23 20.53 430.23 0 413.67 0 413.67 54.1 430.23 54.1 430.23 33.57 469.34 33.57 469.34 54.1 485.91 54.1 485.91 0 469.34 0 469.34 20.53"/>
+  <polygon fill="#ffffff" points="503.13 54.1 568.64 54.1 568.64 41.06 519.88 41.06 519.88 33.57 559.14 33.57 559.14 20.53 519.88 20.53 519.88 13.04 568.64 13.04 568.64 0 503.13 0 503.13 54.1"/>
+  <path fill="#ffffff" d="M650.56,3.33c-2.95-2.21-6.51-3.33-10.58-3.33h-40.6c-4.07,0-7.62,1.12-10.54,3.34-2.99,2.27-4.51,5.05-4.51,8.28v42.48h16.56v-16.89h37.47v16.89h16.76V11.62c0-3.22-1.54-6.01-4.56-8.28ZM638.37,13.04v11.13h-37.47v-11.13h37.47Z"/>
+  <path fill="#ffffff" d="M738.48,3.33c-2.95-2.21-6.51-3.33-10.59-3.33h-55.65v54.1h55.65c4.07,0,7.63-1.12,10.59-3.33,3.03-2.27,4.56-5.05,4.56-8.28V11.62c0-3.23-1.53-6.01-4.56-8.28ZM726.29,13.04v28.02h-37.48V13.04h37.48Z"/></svg>
+    </div>
+  </div>
+
+</div>
+
+<!-- TOUCH CONTROLS (mobile only) -->
+<div class="touch-controls" id="touch-controls">
+  <div class="touch-row">
+    <button class="t-btn" id="t-left" ontouchstart="touchAction('left',$event)" ontouchend="stopRepeat()">◀</button>
+    <button class="t-btn" id="t-rotate" ontouchstart="touchAction('rotate',$event)">↻</button>
+    <button class="t-btn" id="t-right" ontouchstart="touchAction('right',$event)" ontouchend="stopRepeat()">▶</button>
+  </div>
+  <div class="touch-row">
+    <button class="t-btn t-btn-drop" id="t-down" ontouchstart="touchAction('down',$event)" ontouchend="stopRepeat()">▼ SOFT</button>
+    <button class="t-btn t-btn-drop" id="t-hard" ontouchstart="touchAction('hard',$event)">⬇ DROP</button>
+  </div>
+</div>
+
+<footer>AHOLA GROUP <span>|</span> <span class="hide-mobile">FOUNDED 1955 <span>|</span></span> KOKKOLA, FINLAND</footer>
+
+<script>
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const nextCanvas = document.getElementById('next-canvas');
+const nextCtx = nextCanvas.getContext('2d');
+
+const COLS = 10, ROWS = 20;
+let BLOCK = 28;
+
+const COLORS = [null,'#CB043E','#8B0228','#E8234E','#A00030','#FF4D75','#6B0220','#C0033A'];
+const SHAPES = [null,
+  [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+  [[1,1],[1,1]],
+  [[0,1,0],[1,1,1],[0,0,0]],
+  [[0,1,1],[1,1,0],[0,0,0]],
+  [[1,1,0],[0,1,1],[0,0,0]],
+  [[1,0,0],[1,1,1],[0,0,0]],
+  [[0,0,1],[1,1,1],[0,0,0]]
+];
+
+let board, score, lines, level, bestScore, gameRunning, paused, currentPiece, nextPiece, lastDrop, animFrame;
+
+// ── Responsive canvas sizing ──
+function resizeCanvas() {
+  const headerH = document.querySelector('header').offsetHeight;
+  const footerH = document.querySelector('footer').offsetHeight;
+  const isMobile = window.innerWidth <= 600;
+
+  if (isMobile) {
+    // On mobile: stack vertically, canvas fills available width minus padding
+    const topBarH = 70; // compact stat bars
+    const touchH = 120; // touch buttons
+    const availH = window.innerHeight - headerH - footerH - topBarH - touchH - 16;
+    const availW = window.innerWidth - 16;
+    BLOCK = Math.floor(Math.min(availW / COLS, availH / ROWS));
+  } else {
+    // Desktop: fixed comfortable size
+    const availH = window.innerHeight - headerH - footerH - 64;
+    BLOCK = Math.floor(Math.min(availH / ROWS, 30));
+  }
+  BLOCK = Math.max(BLOCK, 18);
+  canvas.width  = COLS * BLOCK;
+  canvas.height = ROWS * BLOCK;
+}
+
+// ── Game logic ──
+function init() {
+  board = Array.from({length:ROWS}, () => Array(COLS).fill(0));
+  score = 0; lines = 0; level = 1;
+  bestScore = parseInt(localStorage.getItem('ahola_tetris') || '0');
+  updateDisplay();
+}
+
+function randPiece() {
+  const id = Math.floor(Math.random() * 7) + 1;
+  return { shape: SHAPES[id].map(r => [...r]), color: id, x: Math.floor(COLS/2) - Math.floor(SHAPES[id][0].length/2), y: 0 };
+}
+
+function startGame() {
+  resizeCanvas();
+  init();
+  currentPiece = randPiece();
+  nextPiece = randPiece();
+  gameRunning = true; paused = false;
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('pause-btn').style.display = 'block';
+  lastDrop = performance.now();
+  cancelAnimationFrame(animFrame);
+  gameLoop(performance.now());
+}
+
+function showMenu() {
+  gameRunning = false; paused = false;
+  cancelAnimationFrame(animFrame);
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('overlay-sub').textContent = 'Stack the blocks · Clear the lines';
+  document.getElementById('overlay-score').style.display = 'none';
+  document.getElementById('overlay-btn').textContent = 'START GAME';
+  document.getElementById('pause-btn').style.display = 'none';
+}
+
+function togglePause() {
+  if (!gameRunning) return;
+  paused = !paused;
+  document.getElementById('pause-btn').textContent = paused ? 'RESUME' : 'PAUSE';
+  if (!paused) { lastDrop = performance.now(); gameLoop(performance.now()); }
+}
+
+function gameLoop(ts) {
+  if (!gameRunning || paused) return;
+  const speed = Math.max(80, 800 - (level - 1) * 80);
+  if (ts - lastDrop >= speed) {
+    if (!moveDown()) {
+      lockPiece(); clearLines();
+      currentPiece = nextPiece; nextPiece = randPiece();
+      if (collides(currentPiece, 0, 0)) { gameOver(); return; }
+    }
+    lastDrop = ts;
+  }
+  draw();
+  animFrame = requestAnimationFrame(gameLoop);
+}
+
+function collides(piece, dx, dy, sh) {
+  const shape = sh || piece.shape;
+  for (let r = 0; r < shape.length; r++)
+    for (let c = 0; c < shape[r].length; c++) {
+      if (!shape[r][c]) continue;
+      const nx = piece.x + c + (dx||0), ny = piece.y + r + (dy||0);
+      if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+      if (ny >= 0 && board[ny][nx]) return true;
+    }
+  return false;
+}
+
+function rotate(shape) {
+  const n = shape.length, m = shape[0].length;
+  const rot = Array.from({length:m}, () => Array(n).fill(0));
+  for (let r = 0; r < n; r++) for (let c = 0; c < m; c++) rot[c][n-1-r] = shape[r][c];
+  return rot;
+}
+
+function moveDown() {
+  if (collides(currentPiece, 0, 1)) return false;
+  currentPiece.y++; return true;
+}
+
+function lockPiece() {
+  currentPiece.shape.forEach((row, r) => row.forEach((v, c) => {
+    if (v && currentPiece.y + r >= 0) board[currentPiece.y + r][currentPiece.x + c] = currentPiece.color;
+  }));
+}
+
+function clearLines() {
+  let cleared = 0;
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(c => c !== 0)) { board.splice(r, 1); board.unshift(Array(COLS).fill(0)); cleared++; r++; }
+  }
+  if (cleared) {
+    score += [0,100,300,500,800][cleared] * level;
+    lines += cleared; level = Math.floor(lines / 10) + 1;
+    if (score > bestScore) { bestScore = score; localStorage.setItem('ahola_tetris', bestScore); }
+    updateDisplay();
+  }
+}
+
+function hardDrop() {
+  while (!collides(currentPiece, 0, 1)) currentPiece.y++;
+  lockPiece(); clearLines();
+  currentPiece = nextPiece; nextPiece = randPiece();
+  if (collides(currentPiece, 0, 0)) { gameOver(); return; }
+  lastDrop = performance.now();
+}
+
+function gameOver() {
+  gameRunning = false;
+  if (score > bestScore) { bestScore = score; localStorage.setItem('ahola_tetris', bestScore); }
+  updateDisplay(); draw();
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('overlay-sub').textContent = 'GAME OVER — FINAL SCORE';
+  document.getElementById('overlay-score').style.display = 'block';
+  document.getElementById('overlay-score').textContent = score.toLocaleString();
+  document.getElementById('overlay-btn').textContent = 'PLAY AGAIN';
+  document.getElementById('pause-btn').style.display = 'none';
+}
+
+function updateDisplay() {
+  document.getElementById('score-display').textContent = score.toLocaleString();
+  document.getElementById('level-display').textContent = level;
+  document.getElementById('lines-display').textContent = lines;
+  document.getElementById('best-display').textContent = bestScore.toLocaleString();
+}
+
+// ── Drawing ──
+function ghostY() {
+  let g = currentPiece.y;
+  while (!collides({...currentPiece, y: g+1}, 0, 0)) g++;
+  return g;
+}
+
+function drawBlock(c, x, y, color) {
+  const px = x*BLOCK, py = y*BLOCK, s = BLOCK-1;
+  c.fillStyle = color; c.fillRect(px+1, py+1, s, s);
+  c.fillStyle = 'rgba(255,255,255,0.22)';
+  c.fillRect(px+1, py+1, s, 3); c.fillRect(px+1, py+1, 3, s);
+  c.fillStyle = 'rgba(0,0,0,0.3)';
+  c.fillRect(px+1, py+s-2, s, 3); c.fillRect(px+s-2, py+1, 3, s);
+}
+
+function draw() {
+  ctx.fillStyle = 'rgba(0,0,0,0.72)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = 'rgba(255,255,255,0.025)'; ctx.lineWidth = 1;
+  for (let r = 0; r <= ROWS; r++) { ctx.beginPath(); ctx.moveTo(0, r*BLOCK); ctx.lineTo(canvas.width, r*BLOCK); ctx.stroke(); }
+  for (let c = 0; c <= COLS; c++) { ctx.beginPath(); ctx.moveTo(c*BLOCK, 0); ctx.lineTo(c*BLOCK, canvas.height); ctx.stroke(); }
+  board.forEach((row, r) => row.forEach((v, c) => { if (v) drawBlock(ctx, c, r, COLORS[v]); }));
+  if (currentPiece) {
+    const gy = ghostY();
+    currentPiece.shape.forEach((row, r) => row.forEach((v, c) => {
+      if (!v) return;
+      ctx.fillStyle = 'rgba(203,4,62,0.12)';
+      ctx.fillRect((currentPiece.x+c)*BLOCK+1, (gy+r)*BLOCK+1, BLOCK-2, BLOCK-2);
+      ctx.strokeStyle = 'rgba(203,4,62,0.28)'; ctx.lineWidth = 1;
+      ctx.strokeRect((currentPiece.x+c)*BLOCK+1, (gy+r)*BLOCK+1, BLOCK-2, BLOCK-2);
+    }));
+    currentPiece.shape.forEach((row, r) => row.forEach((v, c) => {
+      if (v) drawBlock(ctx, currentPiece.x+c, currentPiece.y+r, COLORS[currentPiece.color]);
+    }));
+  }
+  drawNext();
+}
+
+function drawNext() {
+  nextCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  nextCtx.fillRect(0, 0, nextCanvas.width, nextCanvas.height);
+  if (!nextPiece) return;
+  const bs = 16, shape = nextPiece.shape;
+  const ox = Math.floor((nextCanvas.width - shape[0].length*bs) / 2);
+  const oy = Math.floor((nextCanvas.height - shape.length*bs) / 2);
+  shape.forEach((row, r) => row.forEach((v, c) => {
+    if (!v) return;
+    nextCtx.fillStyle = COLORS[nextPiece.color];
+    nextCtx.fillRect(ox+c*bs+1, oy+r*bs+1, bs-2, bs-2);
+    nextCtx.fillStyle = 'rgba(255,255,255,0.2)';
+    nextCtx.fillRect(ox+c*bs+1, oy+r*bs+1, bs-2, 2);
+  }));
+}
+
+// ── Keyboard controls ──
+document.addEventListener('keydown', e => {
+  if (!gameRunning || paused) { if (e.key==='p'||e.key==='P') togglePause(); return; }
+  switch(e.key) {
+    case 'ArrowLeft':  if (!collides(currentPiece,-1,0)) currentPiece.x--; e.preventDefault(); break;
+    case 'ArrowRight': if (!collides(currentPiece,1,0))  currentPiece.x++; e.preventDefault(); break;
+    case 'ArrowDown':  if (!moveDown()) { lockPiece(); clearLines(); currentPiece=nextPiece; nextPiece=randPiece(); } lastDrop=performance.now(); e.preventDefault(); break;
+    case 'ArrowUp':    const rot=rotate(currentPiece.shape); if(!collides(currentPiece,0,0,rot)) currentPiece.shape=rot; e.preventDefault(); break;
+    case ' ':          hardDrop(); e.preventDefault(); break;
+    case 'p': case 'P': togglePause(); break;
+  }
+  draw();
+});
+
+// ── Touch controls ──
+let repeatTimer = null;
+
+function touchAction(action, e) {
+  if (e) e.preventDefault();
+  if (!gameRunning || paused) return;
+  doAction(action);
+  if (action === 'left' || action === 'right' || action === 'down') {
+    repeatTimer = setInterval(() => { if (gameRunning && !paused) doAction(action); }, 120);
+  }
+}
+
+function stopRepeat() { clearInterval(repeatTimer); repeatTimer = null; }
+
+function doAction(action) {
+  switch(action) {
+    case 'left':   if (!collides(currentPiece,-1,0)) currentPiece.x--; break;
+    case 'right':  if (!collides(currentPiece,1,0))  currentPiece.x++; break;
+    case 'rotate': const rot=rotate(currentPiece.shape); if(!collides(currentPiece,0,0,rot)) currentPiece.shape=rot; break;
+    case 'down':   if (!moveDown()) { lockPiece(); clearLines(); currentPiece=nextPiece; nextPiece=randPiece(); if(collides(currentPiece,0,0)){gameOver();return;} } lastDrop=performance.now(); break;
+    case 'hard':   hardDrop(); break;
+  }
+  draw();
+}
+
+// ── Swipe detection on canvas ──
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  touchStartTime = Date.now();
+  e.preventDefault();
+}, {passive: false});
+
+canvas.addEventListener('touchend', e => {
+  if (!gameRunning || paused) return;
+  const dx = e.changedTouches[0].clientX - touchStartX;
+  const dy = e.changedTouches[0].clientY - touchStartY;
+  const dt = Date.now() - touchStartTime;
+  const absDx = Math.abs(dx), absDy = Math.abs(dy);
+
+  if (dt < 200 && absDx < 10 && absDy < 10) {
+    // Tap = rotate
+    doAction('rotate');
+  } else if (absDx > absDy && absDx > 20) {
+    doAction(dx > 0 ? 'right' : 'left');
+  } else if (dy > 40) {
+    doAction('down');
+  } else if (dy < -40) {
+    hardDrop();
+  }
+  e.preventDefault();
+}, {passive: false});
+
+// ── Init ──
+resizeCanvas();
+window.addEventListener('resize', () => { resizeCanvas(); if (!gameRunning) draw(); });
+init(); drawNext();
+ctx.fillStyle = 'rgba(0,0,0,0.72)';
+ctx.fillRect(0, 0, canvas.width, canvas.height);
+</script>
+</body>
+</html>
